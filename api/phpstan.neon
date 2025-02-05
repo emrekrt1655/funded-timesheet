@@ -1,0 +1,22 @@
+parameters:
+    level: 9
+    paths:
+        - bin/
+        - config/
+        - public/
+        - src/
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+        constantHassers: false
+    scanDirectories:
+        - var/cache/dev/Symfony/Config
+    bootstrapFiles:
+        - vendor/autoload.php
+        - src/Kernel.php
+    editorUrl: 'phpstorm://open?file=%%file%%&line=%%line%%'
+
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-symfony/rules.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-doctrine/rules.neon

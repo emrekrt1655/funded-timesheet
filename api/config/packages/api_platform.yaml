@@ -1,11 +1,13 @@
 api_platform:
-    title: Hello API Platform
+    title: FUNDED
     version: 1.0.0
-    # Mercure integration, remove if unwanted
-    mercure:
-        include_type: true
+    formats:
+        jsonld: ['application/ld+json']
     # Good defaults for REST APIs
     defaults:
         stateless: true
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
+    resource_class_directories:
+        - '%kernel.project_dir%/src/Entity'
+        - '%kernel.project_dir%/src/Enum'

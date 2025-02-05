@@ -1,3 +1,83 @@
 {
-  "extends": "next/core-web-vitals"
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "simple-import-sort",
+    "unused-imports",
+    "tailwindcss"
+  ],
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier",
+    "plugin:tailwindcss/recommended"
+  ],
+  "rules": {
+    "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "curly": ["error", "all"],
+    "no-prototype-builtins": "off",
+    "no-unused-vars": "warn",
+    "prefer-template": "error",
+    "react/button-has-type": "error",
+    "react/destructuring-assignment": [
+      "error",
+      "always",
+      {
+        "destructureInSignature": "always"
+      }
+    ],
+    "react/display-name": "warn",
+    "react/function-component-definition": [
+      "error",
+      {
+        "namedComponents": "arrow-function"
+      }
+    ],
+    "react/jsx-curly-brace-presence": "warn",
+    "react/jsx-fragments": "error",
+    "react/jsx-key": [
+      "error",
+      {
+        "checkFragmentShorthand": true,
+        "checkKeyMustBeforeSpread": true,
+        "warnOnDuplicates": true
+      }
+    ],
+    "react/jsx-no-script-url": "error",
+    "react/jsx-no-useless-fragment": "warn",
+    "react/jsx-pascal-case": "error",
+    "react/jsx-sort-props": "warn",
+    "react/no-array-index-key": "warn",
+    "react/no-children-prop": "error",
+    "react/no-danger": "error",
+    "react/no-danger-with-children": "error",
+    "react/no-typos": "warn",
+    "react/no-unstable-nested-components": [
+      "error",
+      {
+        "allowAsProps": true
+      }
+    ],
+    "react/no-unused-prop-types": "error",
+    "react/prefer-stateless-function": "error",
+    "react/self-closing-comp": "warn",
+    "simple-import-sort/exports": "error",
+    "simple-import-sort/imports": "error",
+    "unused-imports/no-unused-imports": "error",
+    "no-console": [
+      "error",
+      {
+        "allow": ["error"]
+      }
+    ]
+  },
+  "settings": {
+    "tailwindcss": {
+      "callees": ["classnames", "clsx", "ctl", "cva", "tv", "cn"]
+    }
+  }
 }
