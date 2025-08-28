@@ -29,3 +29,17 @@ export const METHOD_DELETE = 'DELETE';
 export const HEADER_AUTHORIZATION = 'Authorization';
 export const HEADER_ACCEPT_LANGUAGE = 'Accept-Language';
 export const HEADER_CONTENT_TYPE = 'Content-Type';
+export const MONTHS = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
