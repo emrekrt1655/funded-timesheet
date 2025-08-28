@@ -6,15 +6,24 @@ import {
   fetchPublicHoliday,
   type PublicHolidayListParams,
 } from '@/lib/services/publicHolidays';
-import { PublicHoliday } from '@/types/PublicHoliday';
+import type { PublicHoliday } from '@/types/PublicHoliday';
+
+const publicHolidayKeys = {
+  all: ['public_holidays'] as const,
+  list: (params?: PublicHolidayListParams) =>
+    ['public_holidays', params ?? {}] as const,
+  detail: (idOrIri: string) => ['public_holiday', idOrIri] as const,
+};
 
 export function usePublicHolidays(params?: PublicHolidayListParams) {
-  const { data, ...rest } = useQuery<PublicHoliday[]>({
-    queryKey: ['public_holidays', params ?? {}],
-    queryFn: async () => {
-      const resp = await fetchPublicHolidays(params ?? {});
-      return resp?.data.member ?? [];
-    },
+  const { data, ...rest } = useQuery<
+    { member?: PublicHoliday[] },
+    Error,
+    PublicHoliday[]
+  >({
+    queryKey: publicHolidayKeys.list(params),
+    queryFn: async () => (await fetchPublicHolidays(params ?? {}))!.data,
+    select: (d) => d?.member ?? [],
     retry: false,
     staleTime: 10 * 60 * 1000,
     gcTime: 20 * 60 * 1000,
@@ -28,13 +37,11 @@ export function usePublicHolidays(params?: PublicHolidayListParams) {
 
 export function usePublicHoliday(idOrIri?: string) {
   const { data, ...rest } = useQuery<PublicHoliday>({
-    queryKey: ['public_holiday', idOrIri],
+    queryKey: idOrIri
+      ? publicHolidayKeys.detail(idOrIri)
+      : publicHolidayKeys.detail(''),
     enabled: !!idOrIri,
-    queryFn: async () => {
-      const resp = await fetchPublicHoliday(idOrIri!);
-      if (!resp) throw new Error('Public holiday not found');
-      return resp.data;
-    },
+    queryFn: async () => (await fetchPublicHoliday(idOrIri!))!.data,
     retry: false,
     staleTime: 10 * 60 * 1000,
     gcTime: 20 * 60 * 1000,
