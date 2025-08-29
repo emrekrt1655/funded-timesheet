@@ -9,6 +9,7 @@ import {
   deleteYear,
 } from '@/lib/services/years';
 import type { Year } from '@/types/Year';
+import { isPagedCollection } from '@/types/collection';
 
 const yearsKeys = {
   all: ['years'] as const,
@@ -17,10 +18,10 @@ const yearsKeys = {
 };
 
 export function useYears() {
-  const { data, ...rest } = useQuery<{ member?: Year[] }, Error, Year[]>({
+  const { data, ...rest } = useQuery<{ member?: Year[] } | Year[], Error, Year[]>({
     queryKey: yearsKeys.list,
     queryFn: async () => (await fetchYears()).data,
-    select: (d) => d?.member ?? [],
+    select: (d) => (Array.isArray(d) ? d : (isPagedCollection<Year>(d) ? d.member ?? [] : [])),
     retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

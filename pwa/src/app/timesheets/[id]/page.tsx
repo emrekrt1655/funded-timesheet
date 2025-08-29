@@ -1,25 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useYear } from '@/hooks/useYears';
 import SummaryCards from '@/components/timesheets/SummaryCards';
 import MonthSwitcher from '@/components/timesheets/MonthSwitcher';
 import DaysGrid from '@/components/timesheets/DaysGrid';
 import { useTimesheetSummary } from '@/hooks/useTimesheetSummary';
-import { useMonthDays } from '@/hooks/useMonthDays';
+import DayEditModal from '@/components/timesheets/DayEditModal';
+import type { Day } from '@/types/Day';
 
 export default function TimesheetDetailPage() {
-  const params = useParams();
-  const yearId = Array.isArray(params?.id)
-    ? params?.id[0]
-    : (params?.id as string);
+  const params = useParams<{ id: string | string[] }>();
+  const [editDay, setEditDay] = useState<Day | undefined>(undefined);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const yearId = Array.isArray(params?.id) ? (params.id[0] as string) : (params?.id as string);
 
   const { year, isLoading, isError, error, refetch } = useYear(yearId);
   const totals = useTimesheetSummary(year?.days);
 
-  const [month, setMonth] = useState<number>(new Date().getMonth());
+  const [month, setMonth] = useState<number>(new Date().getUTCMonth());
   const handlePrev = () => setMonth((m) => Math.max(0, m - 1));
   const handleNext = () => setMonth((m) => Math.min(11, m + 1));
 
@@ -32,11 +34,22 @@ export default function TimesheetDetailPage() {
       return next;
     });
 
-  const daysOfMonth = useMonthDays(year?.year, month, year?.days);
+  const toDate = (x: unknown) =>
+    typeof x === 'string' ? new Date(x) : x instanceof Date ? x : new Date(String(x));
 
-  const handleEditDay = (day: any) => {
-    // TODO: open modal and update time
-    alert(`Edit day ${day?.date ?? ''}`);
+  const daysOfMonth = useMemo<Day[]>(() => {
+    if (!year?.days || month == null || !year?.year) return [];
+    return [...year.days]
+      .filter((d) => {
+        const dt = toDate(d.date);
+        return dt.getUTCFullYear() === year.year && dt.getUTCMonth() === month;
+      })
+      .sort((a, b) => toDate(a.date).getTime() - toDate(b.date).getTime());
+  }, [year?.days, year?.year, month]);
+
+  const handleEditDay = (day: Day) => {
+    setEditDay(day);
+    setModalOpen(true);
   };
 
   return (
@@ -95,6 +108,16 @@ export default function TimesheetDetailPage() {
           />
         </div>
       )}
+
+      <DayEditModal
+        open={modalOpen}
+        day={editDay}
+        yearId={yearId}
+        onClose={() => {
+          setModalOpen(false);
+          setEditDay(undefined);
+        }}
+      />
     </div>
   );
 }

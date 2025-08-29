@@ -11,19 +11,19 @@ import type { PublicHoliday } from '@/types/PublicHoliday';
 const publicHolidayKeys = {
   all: ['public_holidays'] as const,
   list: (params?: PublicHolidayListParams) =>
-    ['public_holidays', params ?? {}] as const,
+    ['public_holidays', params ?? null] as const,
   detail: (idOrIri: string) => ['public_holiday', idOrIri] as const,
 };
 
 export function usePublicHolidays(params?: PublicHolidayListParams) {
   const { data, ...rest } = useQuery<
-    { member?: PublicHoliday[] },
+    { member?: PublicHoliday[] } | PublicHoliday[],
     Error,
     PublicHoliday[]
   >({
     queryKey: publicHolidayKeys.list(params),
     queryFn: async () => (await fetchPublicHolidays(params ?? {}))!.data,
-    select: (d) => d?.member ?? [],
+    select: (d) => (Array.isArray(d) ? d : d?.member ?? []),
     retry: false,
     staleTime: 10 * 60 * 1000,
     gcTime: 20 * 60 * 1000,
@@ -34,6 +34,7 @@ export function usePublicHolidays(params?: PublicHolidayListParams) {
     ...rest,
   };
 }
+
 
 export function usePublicHoliday(idOrIri?: string) {
   const { data, ...rest } = useQuery<PublicHoliday>({
