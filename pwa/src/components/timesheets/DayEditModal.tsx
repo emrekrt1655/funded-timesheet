@@ -12,9 +12,7 @@ const schema = z
     hours: z
       .union([z.string(), z.literal('')])
       .transform((v) => (v === '' ? undefined : Number(v)))
-      .refine((v) => v === undefined || (!Number.isNaN(v) && v >= 0), {
-        message: 'Hours must be ≥ 0',
-      })
+      .refine((v) => v === undefined || (!Number.isNaN(v) && v >= 0))
       .optional(),
     off: z
       .union([z.nativeEnum(OffValues), z.literal('')])
@@ -24,28 +22,36 @@ const schema = z
       .union([z.string().min(1), z.literal('')])
       .transform((v) => (v === '' ? undefined : v))
       .optional(),
+    publicHoliday: z
+      .union([z.string().min(1), z.literal('')])
+      .transform((v) => (v === '' ? undefined : v))
+      .optional(),
   })
   .refine(
     (val) => !(val.off !== undefined && val.hours !== undefined && val.hours > 0),
-    { message: 'Off seçiliyken saat girme', path: ['hours'] }
+    { path: ['hours'], message: 'Off seçiliyken saat girme' }
   );
 
 type FormInput = {
   hours: string | '';
   off: OffValues | '';
   finish: string | '';
+  publicHoliday: string | '';
 };
 
 type Parsed = z.output<typeof schema>;
+
+type PublicHolidayOption = { '@id': string; value: string };
 
 type Props = {
   open: boolean;
   day?: Day;
   yearId?: string;
   onClose: () => void;
+  publicHolidays?: PublicHolidayOption[];
 };
 
-export default function DayEditModal({ open, day, yearId, onClose }: Props) {
+export default function DayEditModal({ open, day, yearId, onClose, publicHolidays = [] }: Props) {
   const updateDay = useUpdateDay();
 
   const {
@@ -59,6 +65,7 @@ export default function DayEditModal({ open, day, yearId, onClose }: Props) {
       hours: day?.hours != null ? String(day.hours) : '',
       off: day?.off?.value ?? '',
       finish: day?.finish ? new Date(day.finish).toISOString().slice(0, 10) : '',
+      publicHoliday: (day as any)?.publicHoliday?.['@id'] ?? '',
     },
     mode: 'onTouched',
   });
@@ -68,6 +75,7 @@ export default function DayEditModal({ open, day, yearId, onClose }: Props) {
       hours: day?.hours != null ? String(day.hours) : '',
       off: day?.off?.value ?? '',
       finish: day?.finish ? new Date(day.finish).toISOString().slice(0, 10) : '',
+      publicHoliday: (day as any)?.publicHoliday?.['@id'] ?? '',
     });
   }, [day, reset, open]);
 
@@ -85,10 +93,28 @@ export default function DayEditModal({ open, day, yearId, onClose }: Props) {
 
     const parsed: Parsed = result.data;
 
+    const yearIri =
+      (day as any)?.year && typeof (day as any).year === 'string'
+        ? (day as any).year
+        : (day as any)?.year?.['@id'] ?? (yearId ? `/years/${yearId}` : undefined);
+
+    const dateIso = day?.date ? new Date(day.date).toISOString() : undefined;
+
+    const publicHolidayIri =
+      parsed.publicHoliday ??
+      ((day as any)?.publicHoliday && typeof (day as any).publicHoliday === 'string'
+        ? (day as any).publicHoliday
+        : (day as any)?.publicHoliday?.['@id'] ?? null);
+
+    const finishIso = parsed.finish ? new Date(parsed.finish).toISOString() : dateIso ?? null;
+
     const payload = {
+      year: yearIri,
+      date: dateIso,
+      publicHoliday: publicHolidayIri,
       hours: parsed.off ? null : (parsed.hours ?? null),
-      off: parsed.off ?? null,
-      finish: parsed.finish ?? null,
+      off: parsed.off ? `/offs/${parsed.off === OffValues.vacation ? 'VACATION' : 'SICK'}` : null,
+      finish: finishIso,
     };
 
     await updateDay.mutateAsync({
@@ -137,6 +163,21 @@ export default function DayEditModal({ open, day, yearId, onClose }: Props) {
               ))}
             </select>
             {errors.off && <p className="mt-1 text-sm text-red-600">{String(errors.off.message)}</p>}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Public holiday (optional)</label>
+            <select {...register('publicHoliday')} className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm">
+              <option value="">—</option>
+              {publicHolidays.map((h) => (
+                <option key={h['@id']} value={h['@id']}>
+                  {h.value}
+                </option>
+              ))}
+            </select>
+            {errors.publicHoliday && (
+              <p className="mt-1 text-sm text-red-600">{String(errors.publicHoliday.message)}</p>
+            )}
           </div>
 
           <div>

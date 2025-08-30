@@ -10,6 +10,7 @@ import DaysGrid from '@/components/timesheets/DaysGrid';
 import { useTimesheetSummary } from '@/hooks/useTimesheetSummary';
 import DayEditModal from '@/components/timesheets/DayEditModal';
 import type { Day } from '@/types/Day';
+import { usePublicHolidays } from '@/hooks/usePublicHolidays';
 
 export default function TimesheetDetailPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -19,6 +20,7 @@ export default function TimesheetDetailPage() {
   const yearId = Array.isArray(params?.id) ? (params.id[0] as string) : (params?.id as string);
 
   const { year, isLoading, isError, error, refetch } = useYear(yearId);
+  const {publicHolidays} = usePublicHolidays()
   const totals = useTimesheetSummary(year?.days);
 
   const [month, setMonth] = useState<number>(new Date().getUTCMonth());
@@ -105,11 +107,13 @@ export default function TimesheetDetailPage() {
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onEditDay={handleEditDay}
+            publicHolidays={publicHolidays}
           />
         </div>
       )}
 
       <DayEditModal
+      publicHolidays={publicHolidays}
         open={modalOpen}
         day={editDay}
         yearId={yearId}

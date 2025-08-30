@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import type { Day } from '@/types/Day';
+import type { PublicHoliday } from '@/types/PublicHoliday';
 import { OffValues } from '@/types/Off';
 
 type Props = {
@@ -12,24 +13,33 @@ type Props = {
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
   onEditDay?: (day: Day) => void;
+  publicHolidays?: PublicHoliday[];
 };
+
+function toYYYYMMDD(input?: string | Date) {
+  if (!input) return undefined;
+  const d = typeof input === 'string' ? new Date(input) : input;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    .toISOString()
+    .slice(0, 10);
+}
 
 function getDayKey(d: Day) {
   return d['@id'] ?? String(d.date ?? '');
 }
 
-function getCellClasses(d: Day) {
+function getCellClasses(d: Day, isHoliday: boolean) {
   const classes = ['rounded-lg', 'p-3', 'border', 'border-gray-200'];
 
   const isWeekend = (() => {
     if (!d.date) return false;
     const dt = new Date(d.date);
-    const wd = dt.getUTCDay();
+    const wd = dt.getDay();
     return wd === 0 || wd === 6;
   })();
 
   if (isWeekend) classes.push('bg-blue-50');
-  if (d.publicHoliday) classes.push('bg-green-50');
+  if (isHoliday) classes.push('bg-green-50');
   if (d.off?.value === OffValues.vacation) classes.push('bg-red-50');
   if (d.off?.value === OffValues.sick) classes.push('bg-yellow-50');
 
@@ -39,7 +49,7 @@ function getCellClasses(d: Day) {
 function formatDateLabel(d: Day) {
   if (!d.date) return '—';
   const dt = new Date(d.date);
-  return dt.getUTCDate();
+  return dt.getDate();
 }
 
 export default function DaysGrid({
@@ -50,7 +60,17 @@ export default function DaysGrid({
   selectedIds,
   onToggleSelect,
   onEditDay,
+  publicHolidays = [],
 }: Props) {
+  const holidayByDate = useMemo(() => {
+    const m = new Map<string, PublicHoliday>();
+    for (const h of publicHolidays ?? []) {
+      const key =
+        toYYYYMMDD((h as any).date) ?? toYYYYMMDD((h as any).day) ?? undefined;
+      if (key) m.set(key, h);
+    }
+    return m;
+  }, [publicHolidays]);
   const sorted = useMemo(() => {
     return [...(days ?? [])].sort((a, b) => {
       const da = a.date ? new Date(a.date).getTime() : 0;
@@ -80,11 +100,22 @@ export default function DaysGrid({
           const key = getDayKey(d);
           const isSelected = selectedIds?.has(key);
           const date = d.date ? new Date(d.date) : undefined;
-          const weekday = date ? date.getUTCDay() || 7 : 1;
+
+          const weekday = date ? ((date.getDay() + 6) % 7) + 1 : 1;
+
+          const dateKey = toYYYYMMDD(d.date);
+          const holidayFromProp = dateKey
+            ? holidayByDate.get(dateKey)
+            : undefined;
+          const isHoliday = !!(d.publicHoliday || holidayFromProp);
+          const holidayLabel =
+            (d as any)?.publicHoliday?.value ??
+            (holidayFromProp as any)?.value ??
+            undefined;
 
           return (
             <div key={key} className="contents">
-              {date && date.getUTCDate() === 1 && weekday > 1
+              {date && date.getDate() === 1 && weekday > 1
                 ? Array.from({ length: weekday - 1 }).map((_, i) => (
                     <div key={`sp_${i}`} />
                   ))
@@ -92,7 +123,7 @@ export default function DaysGrid({
 
               <div
                 className={[
-                  getCellClasses(d),
+                  getCellClasses(d, isHoliday),
                   'relative',
                   selectable ? 'cursor-pointer' : '',
                   isSelected ? 'ring-2 ring-blue-500' : '',
@@ -121,8 +152,10 @@ export default function DaysGrid({
                 </div>
 
                 <div className="mt-2 space-y-1 text-xs text-gray-700">
-                  {d.publicHoliday && (
-                    <div className="font-medium">Public holiday</div>
+                  {isHoliday && (
+                    <div className="font-medium">
+                      {holidayLabel ? `${holidayLabel}` : ''}
+                    </div>
                   )}
                   {d.off?.value && (
                     <div>
