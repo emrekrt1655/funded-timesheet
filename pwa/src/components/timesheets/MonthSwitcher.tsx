@@ -1,7 +1,13 @@
 'use client';
 
-import { MONTHS } from '@/lib/constants';
 import { useMemo } from 'react';
+import { MONTHS } from '@/lib/constants';
+
+type MonthStats = {
+  hours: number;
+  sick: number;
+  vacation: number;
+};
 
 type Props = {
   month: number;
@@ -9,6 +15,7 @@ type Props = {
   onPrev: () => void;
   onNext: () => void;
   onChange?: (m: number) => void;
+  stats?: MonthStats;
 };
 
 export default function MonthSwitcher({
@@ -17,6 +24,7 @@ export default function MonthSwitcher({
   onPrev,
   onNext,
   onChange,
+  stats,
 }: Props) {
   const label = useMemo(
     () => `${MONTHS[month]}${year ? ` ${year}` : ''}`,
@@ -25,7 +33,22 @@ export default function MonthSwitcher({
 
   return (
     <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-3">
-      <div className="text-sm font-medium text-gray-700">{label}</div>
+      <div className="text-sm font-medium text-gray-700">
+        {stats && (
+          <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-600">
+            <span>
+              Hours: <span className="font-medium">{stats.hours}</span>
+            </span>
+            <span>
+              Sick: <span className="font-medium">{stats.sick}</span>
+            </span>
+            <span>
+              Vacation: <span className="font-medium">{stats.vacation}</span>
+            </span>
+          </div>
+        )}
+        {label}
+      </div>
       <div className="flex items-center gap-2 text-sm">
         <button
           onClick={onPrev}

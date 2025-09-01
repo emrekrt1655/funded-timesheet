@@ -1,58 +1,49 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
-import { z } from 'zod';
-import { OffValues } from '@/types/Off';
 import { useUpdateDay } from '@/hooks/useUpdateDay';
+import { useBulkUpdateDays } from '@/hooks/useBulkUpdateDays';
+import { useCommonDefaults } from '@/hooks/useCommonDefaultValues';
+import { OffValues } from '@/types/Off';
 import type { Day } from '@/types/Day';
-
-const schema = z
-  .object({
-    hours: z
-      .union([z.string(), z.literal('')])
-      .transform((v) => (v === '' ? undefined : Number(v)))
-      .refine((v) => v === undefined || (!Number.isNaN(v) && v >= 0))
-      .optional(),
-    off: z
-      .union([z.nativeEnum(OffValues), z.literal('')])
-      .transform((v) => (v === '' ? undefined : v))
-      .optional(),
-    finish: z
-      .union([z.string().min(1), z.literal('')])
-      .transform((v) => (v === '' ? undefined : v))
-      .optional(),
-    publicHoliday: z
-      .union([z.string().min(1), z.literal('')])
-      .transform((v) => (v === '' ? undefined : v))
-      .optional(),
-  })
-  .refine(
-    (val) => !(val.off !== undefined && val.hours !== undefined && val.hours > 0),
-    { path: ['hours'], message: 'Off seçiliyken saat girme' }
-  );
-
-type FormInput = {
-  hours: string | '';
-  off: OffValues | '';
-  finish: string | '';
-  publicHoliday: string | '';
-};
-
-type Parsed = z.output<typeof schema>;
+import {
+  schema,
+  type FormInput,
+  type Parsed,
+} from '@/features/timesheets/schema/dayEdit';
 
 type PublicHolidayOption = { '@id': string; value: string };
 
 type Props = {
   open: boolean;
+  mode?: 'single' | 'bulk';
   day?: Day;
+  days?: Day[];
   yearId?: string;
   onClose: () => void;
   publicHolidays?: PublicHolidayOption[];
+  selectedIds?: string[];
 };
 
-export default function DayEditModal({ open, day, yearId, onClose, publicHolidays = [] }: Props) {
+export default function DayEditModal({
+  open,
+  mode = 'single',
+  day,
+  days = [],
+  yearId,
+  onClose,
+  publicHolidays = [],
+}: Props) {
   const updateDay = useUpdateDay();
+  const bulkUpdate = useBulkUpdateDays();
+
+  const selectedDays: Day[] = useMemo(() => {
+    if (mode === 'single') return day ? [day] : [];
+    return days ?? [];
+  }, [mode, day, days]);
+
+  const defaultValues = useCommonDefaults(selectedDays);
 
   const {
     register,
@@ -60,27 +51,21 @@ export default function DayEditModal({ open, day, yearId, onClose, publicHoliday
     formState: { errors, isSubmitting },
     reset,
     setError,
+    watch,
   } = useForm<FormInput>({
-    defaultValues: {
-      hours: day?.hours != null ? String(day.hours) : '',
-      off: day?.off?.value ?? '',
-      finish: day?.finish ? new Date(day.finish).toISOString().slice(0, 10) : '',
-      publicHoliday: (day as any)?.publicHoliday?.['@id'] ?? '',
-    },
+    defaultValues,
     mode: 'onTouched',
   });
 
-  useEffect(() => {
-    reset({
-      hours: day?.hours != null ? String(day.hours) : '',
-      off: day?.off?.value ?? '',
-      finish: day?.finish ? new Date(day.finish).toISOString().slice(0, 10) : '',
-      publicHoliday: (day as any)?.publicHoliday?.['@id'] ?? '',
-    });
-  }, [day, reset, open]);
+  const selectionKey = useMemo(
+    () => selectedDays.map((d) => d['@id'] ?? String(d.date ?? '')).join('|'),
+    [selectedDays],
+  );
+
+  const offWatch = watch('off');
 
   const submit: SubmitHandler<FormInput> = async (values) => {
-    if (!day?.['@id']) return;
+    if (!selectedDays.length) return;
 
     const result = schema.safeParse(values);
     if (!result.success) {
@@ -93,68 +78,182 @@ export default function DayEditModal({ open, day, yearId, onClose, publicHoliday
 
     const parsed: Parsed = result.data;
 
-    const yearIri =
-      (day as any)?.year && typeof (day as any).year === 'string'
-        ? (day as any).year
-        : (day as any)?.year?.['@id'] ?? (yearId ? `/years/${yearId}` : undefined);
+    const payload: Record<string, any> = {};
+    if (parsed.off !== undefined) {
+      payload.off = parsed.off
+        ? `/offs/${parsed.off === OffValues.vacation ? 'VACATION' : 'SICK'}`
+        : null;
+    }
+    if (parsed.hours !== undefined) payload.hours = parsed.hours ?? null;
+    if (parsed.publicHoliday !== undefined)
+      payload.publicHoliday = parsed.publicHoliday ?? null;
+    if (parsed.finish !== undefined) {
+      payload.finish = parsed.finish
+        ? new Date(parsed.finish).toISOString()
+        : null;
+    }
+    if (payload.off) delete payload.hours;
 
-    const dateIso = day?.date ? new Date(day.date).toISOString() : undefined;
+    if (mode === 'single') {
+      const theDay = selectedDays[0];
+      if (!theDay?.['@id']) return;
 
-    const publicHolidayIri =
-      parsed.publicHoliday ??
-      ((day as any)?.publicHoliday && typeof (day as any).publicHoliday === 'string'
-        ? (day as any).publicHoliday
-        : (day as any)?.publicHoliday?.['@id'] ?? null);
+      const yearIri =
+        (theDay as any)?.year && typeof (theDay as any).year === 'string'
+          ? (theDay as any).year
+          : ((theDay as any)?.year?.['@id'] ??
+            (yearId ? `/years/${yearId}` : undefined));
+      const dateIso = theDay?.date
+        ? new Date(theDay.date).toISOString()
+        : undefined;
 
-    const finishIso = parsed.finish ? new Date(parsed.finish).toISOString() : dateIso ?? null;
+      const mergedPayload = { ...payload, year: yearIri, date: dateIso };
 
-    const payload = {
-      year: yearIri,
-      date: dateIso,
-      publicHoliday: publicHolidayIri,
-      hours: parsed.off ? null : (parsed.hours ?? null),
-      off: parsed.off ? `/offs/${parsed.off === OffValues.vacation ? 'VACATION' : 'SICK'}` : null,
-      finish: finishIso,
-    };
+      await updateDay.mutateAsync({
+        idOrIri: theDay['@id'],
+        payload: mergedPayload,
+        invalidateYearId: yearId,
+      });
+    } else {
+      const items = selectedDays
+        .map((d) => {
+          const id = d['@id'];
+          if (typeof id !== 'string') return null;
 
-    await updateDay.mutateAsync({
-      idOrIri: day['@id'],
-      payload,
-      invalidateYearId: yearId,
-    });
+          const yearIri =
+            (d as any)?.year && typeof (d as any).year === 'string'
+              ? (d as any).year
+              : ((d as any)?.year?.['@id'] ??
+                (yearId ? `/years/${yearId}` : undefined));
+
+          const dateIso = d?.date ? new Date(d.date).toISOString() : undefined;
+
+          const existingPH =
+            (d as any)?.publicHoliday &&
+            typeof (d as any).publicHoliday === 'string'
+              ? (d as any).publicHoliday
+              : ((d as any)?.publicHoliday?.['@id'] ?? null);
+
+          const publicHolidayResolved =
+            parsed.publicHoliday !== undefined
+              ? (parsed.publicHoliday ?? null)
+              : existingPH;
+
+          const existingFinish = d.finish
+            ? new Date(d.finish).toISOString()
+            : null;
+          const finishResolved =
+            parsed.finish !== undefined
+              ? parsed.finish
+                ? new Date(parsed.finish).toISOString()
+                : null
+              : (existingFinish ?? dateIso ?? null);
+
+          const base: Record<string, any> = { ...payload };
+          if (base.off) delete base.hours;
+
+          const perItemPayload = {
+            ...base,
+            year: yearIri,
+            date: dateIso,
+            publicHoliday: publicHolidayResolved,
+            finish: finishResolved,
+          };
+
+          return { idOrIri: id, payload: perItemPayload };
+        })
+        .filter(Boolean) as { idOrIri: string; payload: Record<string, any> }[];
+
+      await bulkUpdate.mutateAsync({
+        items,
+        invalidateYearId: yearId,
+      });
+    }
 
     onClose();
   };
 
+  useEffect(() => {
+    if (open) {
+      reset(defaultValues);
+    }
+  }, [open, selectionKey]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
       <div
         className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        <h2 className="mb-4 text-lg font-semibold text-gray-800">
-          Edit Day {day?.date ? new Date(day.date).toDateString() : ''}
+        <h2 className="mb-2 text-lg font-semibold text-gray-800">
+          {mode === 'single'
+            ? `Edit Day ${selectedDays[0]?.date ? new Date(selectedDays[0].date).toDateString() : ''}`
+            : `Edit ${selectedDays.length} selected day${selectedDays.length > 1 ? 's' : ''}`}
         </h2>
+
+        {mode === 'bulk' && (
+          <div className="mb-4 flex flex-wrap gap-1 text-xs text-gray-600">
+            {selectedDays.slice(0, 10).map((d) => {
+              const label = d.date
+                ? new Date(d.date).toISOString().slice(0, 10)
+                : '—';
+              return (
+                <span
+                  key={d['@id'] ?? label}
+                  className="rounded border border-gray-200 px-2 py-0.5"
+                >
+                  {label}
+                </span>
+              );
+            })}
+            {selectedDays.length > 10 && (
+              <span className="rounded border border-gray-200 px-2 py-0.5">
+                +{selectedDays.length - 10} more
+              </span>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
           <div>
-            <label className="mb-1 block text-sm font-medium">Hours</label>
+            <label className="mb-1 block text-sm font-medium">
+              Hours{' '}
+              {mode === 'bulk' && (
+                <span className="text-gray-400">(applies to all)</span>
+              )}
+            </label>
             <input
               type="number"
-              step="0.5"
+              step="1"
               {...register('hours')}
-              className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+              disabled={!!offWatch}
+              className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-50"
             />
-            {errors.hours && <p className="mt-1 text-sm text-red-600">{String(errors.hours.message)}</p>}
+            {errors.hours && (
+              <p className="mt-1 text-sm text-red-600">
+                {String(errors.hours.message)}
+              </p>
+            )}
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Off</label>
-            <select {...register('off')} className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm">
+            <label className="mb-1 block text-sm font-medium">
+              Off{' '}
+              {mode === 'bulk' && (
+                <span className="text-gray-400">(applies to all)</span>
+              )}
+            </label>
+            <select
+              {...register('off')}
+              className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+            >
               <option value="">—</option>
               {Object.values(OffValues).map((v) => (
                 <option key={v} value={v}>
@@ -162,33 +261,36 @@ export default function DayEditModal({ open, day, yearId, onClose, publicHoliday
                 </option>
               ))}
             </select>
-            {errors.off && <p className="mt-1 text-sm text-red-600">{String(errors.off.message)}</p>}
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium">Public holiday (optional)</label>
-            <select {...register('publicHoliday')} className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm">
-              <option value="">—</option>
-              {publicHolidays.map((h) => (
-                <option key={h['@id']} value={h['@id']}>
-                  {h.value}
-                </option>
-              ))}
-            </select>
-            {errors.publicHoliday && (
-              <p className="mt-1 text-sm text-red-600">{String(errors.publicHoliday.message)}</p>
+            {errors.off && (
+              <p className="mt-1 text-sm text-red-600">
+                {String(errors.off.message)}
+              </p>
             )}
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium">Finish (optional)</label>
-            <input
-              type="date"
-              {...register('finish')}
-              className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
-            />
-            {errors.finish && <p className="mt-1 text-sm text-red-600">{String(errors.finish.message)}</p>}
-          </div>
+          {mode === 'single' && (
+            <div>
+              <label className="mb-1 block text-sm font-medium">
+                Public holiday (optional)
+              </label>
+              <select
+                {...register('publicHoliday')}
+                className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+              >
+                <option value="">—</option>
+                {publicHolidays.map((h) => (
+                  <option key={h['@id']} value={h['@id']}>
+                    {h.value}
+                  </option>
+                ))}
+              </select>
+              {errors.publicHoliday && (
+                <p className="mt-1 text-sm text-red-600">
+                  {String(errors.publicHoliday.message)}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button

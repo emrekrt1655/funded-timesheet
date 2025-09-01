@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import type { Day } from '@/types/Day';
 import { OffValues } from '@/types/Off';
-import { legend } from '@/types/Year';
 
 export interface TimesheetSummary {
   totalHours: number;
