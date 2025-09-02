@@ -180,12 +180,12 @@ export default function DayEditModal({
     }
   }, [open, selectionKey]);
 
-  if (!open) return null;
-
   const uid = useId();
   const hoursId = `hours-${uid}`;
   const offId = `off-${uid}`;
   const publicHolidayId = `publicHoliday-${uid}`;
+
+  if (!open) return null;
 
   return (
     <div
