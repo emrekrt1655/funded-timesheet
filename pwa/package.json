@@ -10,7 +10,8 @@
     "lint:fix": "next lint --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "npx vitest run"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",
