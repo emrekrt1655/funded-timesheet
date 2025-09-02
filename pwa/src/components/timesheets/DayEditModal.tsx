@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useId } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { useUpdateDay } from '@/hooks/useUpdateDay';
 import { useBulkUpdateDays } from '@/hooks/useBulkUpdateDays';
@@ -103,6 +103,7 @@ export default function DayEditModal({
           ? (theDay as any).year
           : ((theDay as any)?.year?.['@id'] ??
             (yearId ? `/years/${yearId}` : undefined));
+
       const dateIso = theDay?.date
         ? new Date(theDay.date).toISOString()
         : undefined;
@@ -181,6 +182,11 @@ export default function DayEditModal({
 
   if (!open) return null;
 
+  const uid = useId();
+  const hoursId = `hours-${uid}`;
+  const offId = `off-${uid}`;
+  const publicHolidayId = `publicHoliday-${uid}`;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -194,8 +200,14 @@ export default function DayEditModal({
       >
         <h2 className="mb-2 text-lg font-semibold text-gray-800">
           {mode === 'single'
-            ? `Edit Day ${selectedDays[0]?.date ? new Date(selectedDays[0].date).toDateString() : ''}`
-            : `Edit ${selectedDays.length} selected day${selectedDays.length > 1 ? 's' : ''}`}
+            ? `Edit Day ${
+                selectedDays[0]?.date
+                  ? new Date(selectedDays[0].date).toDateString()
+                  : ''
+              }`
+            : `Edit ${selectedDays.length} selected day${
+                selectedDays.length > 1 ? 's' : ''
+              }`}
         </h2>
 
         {mode === 'bulk' && (
@@ -223,13 +235,14 @@ export default function DayEditModal({
 
         <form onSubmit={handleSubmit(submit)} className="space-y-4" noValidate>
           <div>
-            <label className="mb-1 block text-sm font-medium">
+            <label htmlFor={hoursId} className="mb-1 block text-sm font-medium">
               Hours{' '}
               {mode === 'bulk' && (
                 <span className="text-gray-400">(applies to all)</span>
               )}
             </label>
             <input
+              id={hoursId}
               type="number"
               step="1"
               {...register('hours')}
@@ -244,13 +257,14 @@ export default function DayEditModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">
+            <label htmlFor={offId} className="mb-1 block text-sm font-medium">
               Off{' '}
               {mode === 'bulk' && (
                 <span className="text-gray-400">(applies to all)</span>
               )}
             </label>
             <select
+              id={offId}
               {...register('off')}
               className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
             >
@@ -270,10 +284,14 @@ export default function DayEditModal({
 
           {mode === 'single' && (
             <div>
-              <label className="mb-1 block text-sm font-medium">
+              <label
+                htmlFor={publicHolidayId}
+                className="mb-1 block text-sm font-medium"
+              >
                 Public holiday (optional)
               </label>
               <select
+                id={publicHolidayId}
                 {...register('publicHoliday')}
                 className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
               >
